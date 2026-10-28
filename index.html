@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#386653">
+  <meta name="apple-mobile-web-app-title" content="やることメモ">
+  <title>やることメモ</title>
+  <style>
+:root { font-family: system-ui, -apple-system, "Noto Sans JP", sans-serif; color: #283b35; background: #f5f6f0; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 72px 20px; }
+main { max-width: 640px; margin: auto; }
+.eyebrow { color: #557568; font-size: 14px; letter-spacing: .12em; }
+h1 { font-size: clamp(28px, 6vw, 40px); margin: 14px 0; letter-spacing: -.04em; }
+h1 span { font-size: .8em; }
+.intro { color: #637269; line-height: 1.8; margin-bottom: 36px; }
+form { background: white; border: 1px solid #dce3d8; border-radius: 18px; padding: 24px; box-shadow: 0 8px 30px #283b3506; }
+label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.input-row { display: flex; gap: 10px; }
+input { min-width: 0; flex: 1; border: 1px solid #ced8cf; border-radius: 9px; padding: 14px; font: inherit; background: #fcfdfb; }
+button { cursor: pointer; font: inherit; border: 0; border-radius: 9px; min-height: 44px; padding: 12px 18px; background: #386653; color: white; font-weight: 600; touch-action: manipulation; }
+button:hover { background: #284c3d; }
+:focus-visible { outline: 3px solid #d49836; outline-offset: 3px; }
+.list-heading { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; }
+h2 { font-size: 16px; }
+#count { font-size: 13px; color: #637269; }
+ul { list-style: none; padding: 0; margin: 12px 0; }
+li { display: flex; align-items: center; gap: 14px; padding: 16px; margin-bottom: 10px; border: 1px solid #dce3d8; border-radius: 12px; background: white; }
+li input { flex: none; width: 21px; height: 21px; accent-color: #386653; cursor: pointer; }
+li label { flex: 1; min-width: 0; margin: 0; font-size: 16px; font-weight: 400; overflow-wrap: anywhere; line-height: 1.6; cursor: pointer; }
+li.done label { text-decoration: line-through; color: #7c877e; }
+.delete { flex-shrink: 0; min-width: 44px; background: transparent; color: #777f77; font-size: 13px; padding: 8px; }
+.delete:hover { color: #9f3030; background: #fff0ed; }
+#empty { text-align: center; padding: 40px 12px; color: #798579; line-height: 2; border: 1px dashed #cfd9ca; border-radius: 14px; }
+#message { color: #875821; font-size: 14px; }
+footer { margin-top: 30px; text-align: center; font-size: 12px; color: #7d887c; line-height: 1.8; }
+.sync-panel { margin: 24px 0; padding: 18px; background: #e9eee3; border-radius: 14px; }
+.sync-panel p { margin-top: 0; line-height: 1.8; }
+#sync-status { font-size: 14px; overflow-wrap: anywhere; }
+summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+.help { font-size: 13px; color: #546253; margin: 12px 0; }
+.sync-panel form { margin-top: 16px; padding: 16px; }
+.sync-panel input { display: block; width: 100%; margin-bottom: 16px; }
+.sync-panel button { margin: 4px 4px 4px 0; font-size: 14px; }
+button:disabled, input:disabled { opacity: .65; cursor: wait; }
+[hidden] { display: none !important; }
+@media (max-width: 440px) {
+  body { padding: 28px max(12px, env(safe-area-inset-right)) 36px max(12px, env(safe-area-inset-left)); }
+  form { padding: 16px; }
+  .input-row { flex-direction: column; }
+  .sync-panel { padding: 12px; }
+  .sync-panel form { padding: 12px; }
+  #sync-actions button { display: block; width: 100%; margin: 8px 0; }
+}
+
+</style>
+  
+  
+</head>
+<body>
+  <main>
+    <p class="eyebrow">ひとつずつ、気軽に。</p>
+    <h1>やることメモ<span aria-hidden="true"> 📝</span></h1>
+    <p class="intro">思いついたことを、ここに置いておこう。</p>
+    <section class="sync-panel" aria-label="自動同期">
+      <p id="sync-status" role="status">このブラウザに保存中 · 自動同期は未接続です</p>
+      <details id="sync-settings">
+        <summary>家のパソコンとも同期する</summary>
+        <p class="help">GitHub の非公開リポジトリに保存します。家でも同じ保存先に接続してください。</p>
+        <form id="login-form">
+          <label for="repository">保存先のリポジトリ</label>
+          <input id="repository" placeholder="ユーザー名/yarukoto-memo" required autocomplete="off" spellcheck="false">
+          <label for="github-token">GitHub のアクセストークン</label>
+          <input id="github-token" type="password" required autocomplete="off" spellcheck="false">
+          <p class="help">この保存先だけに Contents の読み書きを許可した Fine-grained token を使います。トークンは画面を閉じると忘れます。チャットには送らないでください。</p>
+          <button type="submit">GitHub に接続して同期する</button>
+        </form>
+      </details>
+      <div id="sync-actions" hidden>
+        <p class="help">約30秒ごとに最新のメモを読み込みます。画面を開き直したときは再接続してください。</p>
+        <button id="refresh" type="button">今すぐ更新</button>
+        <button id="import-local" type="button">この端末のメモを追加</button>
+        <button id="logout" type="button">接続を解除</button>
+      </div>
+    </section>
+    <form id="add-form">
+      <label for="task-input">やること</label>
+      <div class="input-row">
+        <input id="task-input" placeholder="例：帰りに牛乳を買う" maxlength="200" required autocomplete="off">
+        <button type="submit">追加する</button>
+      </div>
+    </form>
+    <div class="list-heading"><h2>あなたのメモ</h2><span id="count" aria-live="polite"></span></div>
+    <ul id="tasks"></ul>
+    <p id="empty">まだメモはありません。<br>まずはひとつ、追加してみましょう。</p>
+    <p id="message" role="status"></p>
+    <footer id="save-note">未接続の間は、このブラウザだけに保存されます。</footer>
+  </main>
+<script>
+// GitHub Contents API. The repository-scoped token lives only in page memory.
+class MemoCloud {
+  constructor(repository, token, request = globalThis.fetch) {
+    const match = /^([A-Za-z0-9][A-Za-z0-9-]*)\/([A-Za-z0-9_.-]+)$/.exec(repository.trim());
+    if (!match || ['.', '..'].includes(match[2])) throw new Error('保存先を「ユーザー名/リポジトリ名」の形で入力してください。');
+    if (!token.trim()) throw new Error('GitHub のアクセストークンを入力してください。');
+    this.repository = repository.trim();
+    this.token = token.trim();
+    // Native browser fetch requires Window as its receiver, not this client.
+    this.fetch = request.bind(globalThis);
+    this.base = `/repos/${encodeURIComponent(match[1])}/${encodeURIComponent(match[2])}`;
+    this.path = `${this.base}/contents/yarukoto-memo.json`;
+    this.user = null;
+  }
+
+  async request(path, { method = 'GET', body, missingOK = false } = {}) {
+    let response;
+    try {
+      response = await this.fetch('https://api.github.com' + path, {
+        method,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${this.token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(15000), cache: 'no-store', redirect: 'error',
+      });
+    } catch {
+      throw new Error('GitHub に接続できません。接続を確認し、「今すぐ更新」で保存状況を確認してください。');
+    }
+    if (response.status === 404 && missingOK) return null;
+    if (!response.ok) {
+      if (response.status === 409 || response.status === 422) throw new Error('別の端末で変更された可能性があります。「今すぐ更新」を押してから、もう一度操作してください。');
+      if (response.status === 401) throw new Error('アクセストークンが無効または期限切れです。接続を解除して設定し直してください。');
+      if (response.status === 403 || response.status === 429) throw new Error('GitHub のアクセス権限または利用制限を確認してください。しばらく待ってから再度お試しください。');
+      if (response.status === 404) throw new Error('リポジトリが見つからないか、トークンにアクセス権限がありません。');
+      throw new Error('GitHub への保存に失敗しました。「今すぐ更新」で保存状況を確認してください。');
+    }
+    return response.status === 204 ? null : response.json();
+  }
+
+  async connect() {
+    const user = await this.request('/user');
+    const repo = await this.request(this.base);
+    if (repo.private !== true) throw new Error('メモの保存には Private（非公開）のリポジトリを指定してください。');
+    if (repo.permissions?.push === false) throw new Error('このリポジトリへの書き込み権限がありません。');
+    this.user = user;
+    return this.load();
+  }
+
+  static encode(value) {
+    return btoa(Array.from(new TextEncoder().encode(JSON.stringify(value)), byte => String.fromCharCode(byte)).join(''));
+  }
+
+  static decode(content) {
+    try {
+      const raw = atob(content.replace(/\s/g, ''));
+      const document = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(raw, c => c.charCodeAt(0))));
+      const ids = new Set();
+      if (document.version !== 1 || !Array.isArray(document.tasks) || !document.tasks.every(task => {
+        if (!task || typeof task.id !== 'string' || !task.id || ids.has(task.id) || typeof task.text !== 'string' || !task.text.trim() || task.text.length > 200 || typeof task.done !== 'boolean') return false;
+        ids.add(task.id); return true;
+      })) throw new Error();
+      return document.tasks.map(({ id, text, done }) => ({ id, text, done }));
+    } catch {
+      throw new Error('保存ファイルの形式を読み取れませんでした。元のファイルは上書きしていません。');
+    }
+  }
+
+  async snapshot() {
+    const file = await this.request(this.path, { missingOK: true });
+    if (!file) return { tasks: [], sha: null };
+    if (file.type !== 'file' || file.encoding !== 'base64' || typeof file.content !== 'string' || !file.sha) throw new Error('保存ファイルを読み取れませんでした。元のファイルは上書きしていません。');
+    return { tasks: MemoCloud.decode(file.content), sha: file.sha };
+  }
+
+  async load() { return (await this.snapshot()).tasks; }
+
+  async write(change) {
+    // Fresh reads preserve other devices' changes; SHA guards concurrent writes.
+    const snapshot = await this.snapshot();
+    const tasks = change(snapshot.tasks);
+    await this.request(this.path, {
+      method: 'PUT', body: {
+        message: 'Update personal memos',
+        content: MemoCloud.encode({ version: 1, tasks }),
+        ...(snapshot.sha ? { sha: snapshot.sha } : {}),
+      },
+    });
+    return tasks;
+  }
+
+  add(items) {
+    return this.write(tasks => {
+      const existing = new Set(tasks.map(task => task.id));
+      return [...tasks, ...items.filter(task => !existing.has(task.id)).map(({ id, text, done }) => ({ id, text, done }))];
+    });
+  }
+
+  change(id, done) {
+    return this.write(tasks => {
+      if (!tasks.some(task => task.id === id)) throw new Error('このメモは別の端末で削除されたようです。「今すぐ更新」を押してください。');
+      return tasks.map(task => task.id === id ? { ...task, done } : task);
+    });
+  }
+
+  remove(id) { return this.write(tasks => tasks.filter(task => task.id !== id)); }
+  signOut() { this.token = ''; this.user = null; }
+}
+
+globalThis.MemoCloud = MemoCloud;
+if (typeof module !== 'undefined') module.exports = MemoCloud;
+
+const storageKey = 'yarukoto-memo-v1';
+const form = document.querySelector('#add-form');
+const input = document.querySelector('#task-input');
+const list = document.querySelector('#tasks');
+const message = document.querySelector('#message');
+let tasks = [];
+let localTasks = [];
+let cloud = null;
+let busy = false;
+let timer = null;
+const syncStatus = document.querySelector('#sync-status');
+const loginForm = document.querySelector('#login-form');
+const syncActions = document.querySelector('#sync-actions');
+const repositoryInput = document.querySelector('#repository');
+const tokenInput = document.querySelector('#github-token');
+try {
+  const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  if (!Array.isArray(saved) || !saved.every(task => task && typeof task.text === 'string' && typeof task.done === 'boolean')) throw new Error('Invalid data');
+  tasks = saved.map(task => ({ ...task, id: task.id || crypto.randomUUID() }));
+  localTasks = tasks;
+} catch {
+  message.textContent = '保存したメモを読み込めませんでした。この画面では引き続き使えます。';
+}
+
+function save() {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(tasks));
+    message.textContent = '';
+  } catch {
+    message.textContent = '自動保存ができません。この画面を閉じると変更が失われることがあります。';
+  }
+}
+
+function render() {
+  list.replaceChildren();
+  tasks.forEach((task, index) => {
+    const row = document.createElement('li');
+    row.classList.toggle('done', task.done);
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `task-${index}`;
+    checkbox.checked = task.done;
+    const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
+    label.textContent = task.text;
+    checkbox.addEventListener('change', () => {
+      const done = checkbox.checked;
+      checkbox.checked = task.done;
+      run(async () => {
+        if (cloud) { tasks = await cloud.change(task.id, done); render(); }
+        else {
+          task.done = done;
+          save();
+          row.classList.toggle('done', done);
+          checkbox.checked = done;
+          updateCount();
+        }
+        markSynced();
+      });
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'delete';
+    remove.textContent = '削除';
+    remove.setAttribute('aria-label', `${task.text}を削除`);
+    remove.addEventListener('click', () => {
+      run(async () => {
+        if (cloud) tasks = await cloud.remove(task.id);
+        else { tasks.splice(index, 1); save(); }
+        render();
+        const remaining = list.querySelectorAll('.delete');
+        (remaining[Math.min(index, remaining.length - 1)] || input).focus();
+        markSynced();
+      });
+    });
+    row.append(checkbox, label, remove);
+    list.append(row);
+  });
+  document.querySelector('#empty').hidden = tasks.length > 0;
+  updateCount();
+}
+
+function updateCount() {
+  document.querySelector('#count').textContent = `残り ${tasks.filter(task => !task.done).length} 件`;
+}
+
+form.addEventListener('submit', event => {
+  event.preventDefault();
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+  run(async () => {
+    const task = { id: crypto.randomUUID(), text, done: false };
+    if (cloud) tasks = await cloud.add([task]);
+    else { tasks.push(task); save(); }
+    render();
+    input.value = '';
+    markSynced();
+  }).then(() => input.focus());
+});
+
+function markSynced() {
+  if (cloud) syncStatus.textContent = `同期済み · ${cloud.user.login} / ${cloud.repository} · ${new Date().toLocaleTimeString('ja-JP')}`;
+}
+
+async function run(action) {
+  if (busy) return;
+  busy = true;
+  const activeElement = document.activeElement;
+  document.querySelectorAll('button, input').forEach(element => { element.disabled = true; });
+  try {
+    message.textContent = '';
+    await action();
+  } catch (error) {
+    message.textContent = error.message || '操作を完了できませんでした。もう一度お試しください。';
+    if (cloud) syncStatus.textContent = '同期できていません · 変更を自動で再送することはありません';
+  } finally {
+    busy = false;
+    document.querySelectorAll('button, input').forEach(element => { element.disabled = false; });
+    if (activeElement?.isConnected && document.activeElement === document.body) activeElement.focus();
+  }
+}
+
+async function refresh() {
+  const currentCloud = cloud;
+  if (!currentCloud) return;
+  const latest = await currentCloud.load();
+  if (cloud !== currentCloud) return;
+  if (JSON.stringify(latest) !== JSON.stringify(tasks)) {
+    tasks = latest;
+    render();
+  }
+  markSynced();
+}
+
+loginForm.addEventListener('submit', event => {
+  event.preventDefault();
+  run(async () => {
+    const candidate = new MemoCloud(repositoryInput.value.trim(), tokenInput.value.trim());
+    const latest = await candidate.connect();
+    save();
+    localTasks = tasks;
+    cloud = candidate;
+    tasks = latest;
+    tokenInput.value = '';
+    try { localStorage.setItem('yarukoto-github-repository', candidate.repository); } catch {}
+    loginForm.hidden = true;
+    document.querySelector('#sync-settings').open = false;
+    document.querySelector('#sync-settings').hidden = true;
+    syncActions.hidden = false;
+    document.querySelector('#save-note').textContent = 'GitHub の非公開リポジトリと同期中です。家でも同じ保存先に接続してください。';
+    render();
+    markSynced();
+    timer = setInterval(() => {
+      if (!document.hidden && !busy) run(refresh);
+    }, 30000);
+  });
+});
+
+document.querySelector('#refresh').addEventListener('click', () => run(refresh));
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && cloud && !busy) run(refresh);
+});
+document.querySelector('#import-local').addEventListener('click', () => run(async () => {
+  if (!localTasks.length) throw new Error('この端末に取り込めるメモはありません。');
+  tasks = await cloud.add(localTasks);
+  render();
+  markSynced();
+}));
+document.querySelector('#logout').addEventListener('click', () => run(async () => {
+  const previous = cloud;
+  clearInterval(timer);
+  cloud = null;
+  tasks = localTasks;
+  loginForm.hidden = false;
+  syncActions.hidden = true;
+  document.querySelector('#sync-settings').hidden = false;
+  document.querySelector('#save-note').textContent = '未接続の間は、このブラウザだけに保存されます。';
+  syncStatus.textContent = '接続を解除しました · このブラウザのメモを表示しています';
+  render();
+  previous.signOut();
+}));
+
+try {
+  repositoryInput.value = localStorage.getItem('yarukoto-github-repository') || '';
+} catch { /* Local memos still work without persisted connection settings. */ }
+
+render();
+
+</script>
+</body>
+</html>
